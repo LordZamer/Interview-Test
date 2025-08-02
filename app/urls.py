@@ -1,12 +1,21 @@
-from django.urls import path
-from . import views
+# backend/app/urls.py
+from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-
-urlpatterns = [
-]
+from .views import (
+    UserViewSet,
+    PageViewSet,
+    PermissionViewSet,
+    CommentViewSet,
+    CommentHistoryViewSet
+)
 
 router = DefaultRouter()
-router.register('comments', views.CommentViewSet)
-router.register('pages', views.PageViewSet)
-router.register('pageComents', views.PageCommentViewSet)
-urlpatterns += router.urls
+router.register(r'users', UserViewSet)
+router.register(r'pages', PageViewSet, basename='pages')
+router.register(r'permissions', PermissionViewSet, basename='permissions')
+router.register(r'comments', CommentViewSet, basename='comments')
+router.register(r'history', CommentHistoryViewSet, basename='history')
+
+urlpatterns = [
+    path('', include(router.urls)),
+]

@@ -1,7 +1,90 @@
-POST http://127.0.0.1:8000/api/token/ HTTP/1.1
+@access_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU0MTI2OTUyLCJpYXQiOjE3NTQxMjMzNTIsImp0aSI6IjI0YjljMDZlYzNjMzRjOTk4YjM0N2M3YzViMzk1M2U4IiwidXNlcl9pZCI6ImI4OGE2MDllLTk3OWEtNGUyZi04NzkzLTQ1YTI5MWJkNzliZCJ9.0rPeYOQFM4aQWftgstCadPNyb3-JaM100RHecxJZ4Q4
+@refresh_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc1NDIwNjg5OCwiaWF0IjoxNzU0MTIwNDk4LCJqdGkiOiI2OWY4MmE3YmIwYWI0YTM1YTY3NWEwMTUyMjYwM2UwMCIsInVzZXJfaWQiOiJiODhhNjA5ZS05NzlhLTRlMmYtODc5My00NWEyOTFiZDc5YmQifQ.mlc6VyCoGsziA5Nw06-UIqkpFTze6ez16NUeYwlN5lE
+
+### Register Super Admin (for initial setup)
+POST http://localhost:8000/users/
 Content-Type: application/json
 
 {
-    "username": "samer",
-    "password": "test"
+  "email": "admin@example.com",
+  "name": "Super Admin",
+  "password": "AdminPass123!"
 }
+
+### Login to get JWT
+POST http://localhost:8000/api/token/
+Content-Type: application/json
+
+{
+  "email": "Samer@example.com",
+  "password": "test"
+}
+
+### Refresh Token
+POST http://localhost:8000/api/token/refresh/
+Content-Type: application/json
+
+{
+  "refresh": "{{refresh_token}}"
+}
+
+### Get all users
+GET http://localhost:8000/users/
+Authorization: Bearer {{access_token}}
+
+
+### Create Page
+POST http://localhost:8000/pages/
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "name": "Media Plans"
+}
+
+### Get all pages
+GET http://localhost:8000/pages/
+Authorization: Bearer {{access_token}}
+
+### Assign permission to user
+POST http://localhost:8000/permissions/
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "user": "b88a609e-979a-4e2f-8793-45a291bd79bd",
+  "page": "2",
+  "permission_type": "view"
+}
+
+
+
+### get all comments
+GET http://localhost:8000/comments/
+Authorization: Bearer {{access_token}}
+
+
+
+
+### Post a comment
+POST http://localhost:8000/comments/
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "page": "1",
+  "content": "First comment on this page"
+}
+
+### Update comment
+PUT http://localhost:8000/comments/4e416ab3-1f60-4be6-be52-87ecb6eae50d/
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "content": "Updated comment content"
+}
+
+### View comment history (superuser only)
+GET http://localhost:8000/history/
+Authorization: Bearer {{access_token}}

@@ -1,75 +1,81 @@
-from rest_framework import viewsets
+from rest_framework import viewsets, permissions, status
+from rest_framework.response import Response
+from rest_framework.decorators import action
+from .models import User, Page, Permission, Comment, CommentHistory
+from .serializers import (
+    UserSerializer, PageSerializer, PermissionSerializer,
+    CommentSerializer, CommentHistorySerializer
+)
+from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
-from .models import Comment, Page, PageComment, PagePermission
-from .serializers import CommentSerializer, PageSerializer, PageCommentSerializer
-from rest_framework.exceptions import PermissionDenied
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
-class PageAccessPermissionMixin:
-    permission_type = None  # override in subclasses: 'view', 'edit', etc.
+
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    authentication_classes = [JWTAuthentication]
+    # permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        user = self.request.user
-        if user.is_super_admin:
-            return super().get_queryset()
-
-        page_ids = PagePermission.objects.filter(
-            user=user,
-            access_type=self.permission_type
-        ).values_list('page_id', flat=True)
-
-        if hasattr(super(), 'get_queryset'):
-            return super().get_queryset().filter(page_id__in=page_ids)
-        return super().get_queryset()
-
-    def has_page_permission(self, page):
-        if self.request.user.is_super_admin:
-            return True
-        return PagePermission.objects.filter(
-            user=self.request.user,
-            page=page,
-            access_type=self.permission_type
-        ).exists()
-
-class CommentViewSet(PageAccessPermissionMixin, viewsets.ModelViewSet):
-    queryset = Comment.objects.all()
-    serializer_class = CommentSerializer
-    permission_classes = [IsAuthenticated]
-    permission_type = 'view'
-
-    def perform_update(self, serializer):
-        comment = self.get_object()
-        if not self.has_page_permission(comment.pagecomment.page):
-            raise PermissionDenied("No edit permission for this page.")
-        serializer.save()
-
-    def perform_destroy(self, instance):
-        if not self.has_page_permission(instance.pagecomment.page):
-            raise PermissionDenied("No delete permission for this page.")
-        instance.delete()
-
-class PageViewSet(PageAccessPermissionMixin, viewsets.ModelViewSet):
-    queryset = Page.objects.all()
-    serializer_class = PageSerializer
-    permission_classes = [IsAuthenticated]
-    permission_type = 'view'
-
-class PageCommentViewSet(PageAccessPermissionMixin, viewsets.ModelViewSet):
-    queryset = PageComment.objects.all()
-    serializer_class = PageCommentSerializer
-    permission_classes = [IsAuthenticated]
-    permission_type = 'view'
+        if self.request.user.is_superuser:
+            return User.objects.all()
+        return User.objects.filter(id=self.request.user.id)
 
     def perform_create(self, serializer):
-        if not self.has_page_permission(serializer.validated_data['page']):
-            raise PermissionDenied("No create permission for this page.")
         serializer.save()
+
+
+class PageViewSet(viewsets.ModelViewSet):
+    queryset = Page.objects.all()
+    serializer_class = PageSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+
+class PermissionViewSet(viewsets.ModelViewSet):
+    queryset = Permission.objects.all()
+    serializer_class = PermissionSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return Permission.objects.all()
+        return Permission.objects.filter(user=self.request.user)
+
+
+class CommentViewSet(viewsets.ModelViewSet):
+    queryset = Comment.objects.all()
+    serializer_class = CommentSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return Comment.objects.all()
+        user_permissions = Permission.objects.filter(user=self.request.user, permission_type='view')
+        return Comment.objects.filter(page__in=[p.page for p in user_permissions])
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
     def perform_update(self, serializer):
-        if not self.has_page_permission(serializer.instance.page):
-            raise PermissionDenied("No edit permission for this page.")
-        serializer.save()
+        instance = serializer.save()
+        CommentHistory.objects.create(
+            comment=instance,
+            modified_by=self.request.user,
+            original_content=self.request.data.get('content', '')
+        )
 
-    def perform_destroy(self, instance):
-        if not self.has_page_permission(instance.page):
-            raise PermissionDenied("No delete permission for this page.")
-        instance.delete()
+
+class CommentHistoryViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = CommentHistory.objects.all()
+    serializer_class = CommentHistorySerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return CommentHistory.objects.all()
+        return CommentHistory.objects.none()
